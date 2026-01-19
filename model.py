@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 import torchvision.models as models
 
@@ -7,6 +6,9 @@ class ContrastiveModel(nn.Module):
         super().__init__()
 
         backbone = models.resnet18(pretrained=False)
+        backbone.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        backbone.maxpool = nn.Identity()
+
         self.encoder = nn.Sequential(*list(backbone.children())[:-1])
 
         self.projector = nn.Sequential(

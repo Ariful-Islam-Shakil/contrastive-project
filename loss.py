@@ -1,26 +1,23 @@
 import torch
 import torch.nn.functional as F
 
-def contrastive_loss(z1, z2, temperature=0.5):
+def nt_xent_loss(z1, z2, temperature=0.5):
     z1 = F.normalize(z1, dim=1)
     z2 = F.normalize(z2, dim=1)
 
     batch_size = z1.size(0)
+    z = torch.cat([z1, z2], dim=0)
 
-    representations = torch.cat([z1, z2], dim=0)
-    similarity_matrix = torch.matmul(representations, representations.T)
+    sim = torch.matmul(z, z.T) / temperature
+    mask = torch.eye(2 * batch_size, device=z.device).bool()
+    sim = sim.masked_fill(mask, -9e15)
 
-    labels = torch.arange(batch_size)
-    labels = torch.cat([labels, labels]).to(z1.device)
+    positives = torch.cat([
+        torch.diag(sim, batch_size),
+        torch.diag(sim, -batch_size)
+    ])
 
-    mask = torch.eye(2 * batch_size).bool().to(z1.device)
-    similarity_matrix = similarity_matrix[~mask].view(2 * batch_size, -1)
+    labels = torch.zeros(2 * batch_size, dtype=torch.long, device=z.device)
+    logits = torch.cat([positives.unsqueeze(1), sim], dim=1)
 
-    positives = torch.sum(z1 * z2, dim=-1)
-    positives = torch.cat([positives, positives])
-
-    numerator = torch.exp(positives / temperature)
-    denominator = torch.sum(torch.exp(similarity_matrix / temperature), dim=1)
-
-    loss = -torch.log(numerator / denominator)
-    return loss.mean()
+    return F.cross_entropy(logits, labels)

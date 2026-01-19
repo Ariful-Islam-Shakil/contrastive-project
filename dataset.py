@@ -1,28 +1,28 @@
 import torch
-from torchvision import transforms
-from PIL import Image
-import os
+from torchvision import datasets, transforms
 
-class ContrastiveDataset(torch.utils.data.Dataset):
-    def __init__(self, img_dir):
-        self.img_dir = img_dir
-        self.images = os.listdir(img_dir)
-
+class ContrastiveCIFAR10(torch.utils.data.Dataset):
+    def __init__(self):
         self.transform = transforms.Compose([
-            transforms.RandomResizedCrop(224),
+            transforms.RandomResizedCrop(32),
             transforms.RandomHorizontalFlip(),
             transforms.ColorJitter(0.4, 0.4, 0.4),
             transforms.ToTensor()
         ])
 
+        self.dataset = datasets.CIFAR10(
+            root="./data",
+            train=True,
+            download=True
+        )
+
     def __len__(self):
-        return len(self.images)
+        return len(self.dataset)
 
     def __getitem__(self, idx):
-        img_path = os.path.join(self.img_dir, self.images[idx])
-        img = Image.open(img_path).convert("RGB")
+        img, _ = self.dataset[idx]
 
-        view1 = self.transform(img)
-        view2 = self.transform(img)
+        x1 = self.transform(img)
+        x2 = self.transform(img)
 
-        return view1, view2
+        return x1, x2

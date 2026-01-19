@@ -1,36 +1,59 @@
 import torch
 from torch.utils.data import DataLoader
-from dataset import ContrastiveDataset
+from tqdm import tqdm
+
+from dataset import ContrastiveCIFAR10
 from model import ContrastiveModel
-from loss import contrastive_loss
+from loss import nt_xent_loss
+
 
 def training():
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = (
+        "cuda" if torch.cuda.is_available()
+        else "mps" if torch.backends.mps.is_available()
+        else "cpu"
+    )
 
-    dataset = ContrastiveDataset("dataset/images")
-    loader = DataLoader(dataset, batch_size=16, shuffle=True)
+    print(f"\nUsing device: {device}\n")
+
+    dataset = ContrastiveCIFAR10()
+    loader = DataLoader(dataset, batch_size=128, shuffle=True)
 
     model = ContrastiveModel().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-    epochs = 50
+    epochs = 3
+    print("Starting training...\n")
 
     for epoch in range(epochs):
-        total_loss = 0
-        for x1, x2 in loader:
+        model.train()
+        total_loss = 0.0
+
+        progress_bar = tqdm(
+            loader,
+            desc=f"Epoch [{epoch+1}/{epochs}]",
+            leave=False
+        )
+
+        for step, (x1, x2) in enumerate(progress_bar):
             x1, x2 = x1.to(device), x2.to(device)
 
             z1 = model(x1)
             z2 = model(x2)
 
-            loss = contrastive_loss(z1, z2)
+            loss = nt_xent_loss(z1, z2)
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             total_loss += loss.item()
+            avg_loss = total_loss / (step + 1)
 
-        print(f"Epoch [{epoch+1}/{epochs}] Loss: {total_loss/len(loader):.4f}")
+            progress_bar.set_postfix(loss=f"{avg_loss:.4f}")
+
+        print(f"Epoch [{epoch+1}/{epochs}] Average Loss: {avg_loss:.4f}")
+
+
 if __name__ == "__main__":
     training()
